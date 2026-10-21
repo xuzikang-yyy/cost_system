@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}成本规则 · 采购成本核价系统{% endblock %}
+{% block page_title %}成本规则{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> 成本规则{% endblock %}
+
+{% block header_actions %}
+    {% if user.is_superuser %}
+        <a href="{% url 'pricing:rule_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>新增规则
+        </a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="alert-panel info mb-3">
+    <i class="bi bi-diagram-3"></i>
+    <div>核价时按零件的<strong>类别</strong>匹配当前生效日期内、生效日期最新的一条规则。规则调整后建议新增版本，不要直接修改已使用过的规则，以保留历史解释力。</div>
+</div>
+
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-sliders"></i>规则版本</h2>
+            <div class="section-sub">共 {{ rules|length }} 条规则 · 损耗率与加成率均按百分比保存</div>
+        </div>
+    </div>
+    <div class="panel-body tight">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:24%">规则</th>
+                        <th>适用类别</th>
+                        <th class="text-end">损耗率</th>
+                        <th class="text-end">加工 / 其他费用</th>
+                        <th class="text-end">加成率</th>
+                        <th class="text-center">偏差区间</th>
+                        <th>生效日期</th>
+                        <th>状态</th>
+                        <th class="actions">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rule in rules %}
+                        <tr>
+                            <td>
+                                <div class="cell-title">{{ rule.name }}</div>
+                                <div class="cell-sub">版本 {{ rule.version }}{% if rule.remark %} · {{ rule.remark }}{% endif %}</div>
+                            </td>
+                            <td><span class="tag tag-blue">{{ rule.category }}</span></td>
+                            <td class="text-end num">{{ rule.loss_rate|money }}%</td>
+                            <td class="text-end num">
+                                ¥{{ rule.processing_fee|money }}
+                                <div class="cell-sub">
+                                    外协 {{ rule.outsourcing_fee|money }} · 包装 {{ rule.packaging_fee|money }}
+                                </div>
+                            </td>
+                            <td class="text-end num">+{{ rule.markup_rate|money }}%</td>
+                            <td class="text-center">
+                                <span class="tag tag-gray">{{ rule.deviation_low|signed }}% ~ {{ rule.deviation_high|signed }}%</span>
+                            </td>
+                            <td class="cell-sub">{{ rule.effective_date|date:"Y-m-d" }}</td>
+                            <td>
+                                {% if rule.is_active %}
+                                    <span class="tag tag-green"><span class="dot-indicator"></span>启用</span>
+                                {% else %}
+                                    <span class="tag tag-gray">停用</span>
+                                {% endif %}
+                            </td>
+                            <td class="actions">
+                                {% if user.is_superuser %}
+                                    <a href="{% url 'pricing:rule_edit' rule.pk %}" class="btn btn-ghost btn-sm"><i class="bi bi-pencil"></i> 编辑</a>
+                                {% else %}
+                                    <span class="cell-sub">只读</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9">
+                                <div class="empty-state">
+                                    <i class="bi bi-sliders"></i>
+                                    <h6>尚未配置成本规则</h6>
+                                    <p>核价前至少需要为铜件、铝件、塑料件配置一条生效规则。</p>
+                                    {% if user.is_superuser %}
+                                        <a href="{% url 'pricing:rule_create' %}" class="btn btn-primary btn-sm">新增规则</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-book"></i>规则如何参与计算</h2>
+            <div class="section-sub">核价单保存时，以下参数会全部写入快照</div>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="form-label">① 材料投入与材料成本</div>
+                <div class="formula-box">
+                    投入量 = 净重 ÷ (1 − <b>损耗率</b>)<br>
+                    材料成本 = 投入量 × 材料单价
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-label">② 分项费用与废料回收</div>
+                <div class="formula-box">
+                    理论成本 = 材料 + <b>加工费</b> + 外协 + 包装<br>
+                    + 制造费用 − 废料重量 × <b>废料单价</b>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-label">③ 参考报价与偏差判定</div>
+                <div class="formula-box">
+                    参考价 = 理论成本 × (1 + <b>加成率</b>)<br>
+                    偏差率区间：<b>下限</b> ~ <b>上限</b>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

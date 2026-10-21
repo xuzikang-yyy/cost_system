@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · 采购成本核价系统{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> <a href="{% url 'pricing:part_list' %}" style="color:inherit">零件信息</a> <span>/</span> {{ title }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-box-seam"></i>{{ title }}</h2>
+                    <div class="section-sub">净重是材料成本计算的基础，请按成品实际称重填写</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="form-grid">
+                        <div class="form-section-label">零件基础信息</div>
+                        {% include "partials/field.html" with field=form.code %}
+                        {% include "partials/field.html" with field=form.name %}
+                        {% include "partials/field.html" with field=form.material %}
+                        {% include "partials/field.html" with field=form.category %}
+                        <div class="span-2">
+                            {% include "partials/field.html" with field=form.specification %}
+                        </div>
+                        <div class="form-section-label">核价参数</div>
+                        {% include "partials/field.html" with field=form.net_weight %}
+                        {% include "partials/field.html" with field=form.drawing_no %}
+                        <div class="span-2">
+                            {% include "partials/field.html" with field=form.remark %}
+                        </div>
+                        <div class="span-2">
+                            <div class="form-check">
+                                {{ form.status }}
+                                <label class="form-check-label" for="{{ form.status.id_for_label }}">启用该零件</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <a href="{% url 'pricing:part_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div><h2 class="section-title"><i class="bi bi-info-circle"></i>字段说明</h2></div>
+            </div>
+            <div class="panel-body">
+                <div class="mb-3">
+                    <div class="form-label">成品净重</div>
+                    <div class="cell-sub" style="line-height:1.8">材料成本的起点。系统按“净重 ÷ (1 − 损耗率)”计算材料投入量，而非直接使用净重乘以单价。</div>
+                </div>
+                <div class="mb-3">
+                    <div class="form-label">零件类别</div>
+                    <div class="cell-sub" style="line-height:1.8">决定核价时匹配哪一条成本规则（损耗率、加工费、加成率、偏差阈值）。</div>
+                </div>
+                <div class="mb-3">
+                    <div class="form-label">原材料</div>
+                    <div class="cell-sub" style="line-height:1.8">关联材料主数据，核价时自动匹配该材料在指定日期前最近一次生效价格。</div>
+                </div>
+                <div class="alert-panel info">
+                    <i class="bi bi-lightbulb"></i>
+                    <div>材料相同但规格不同的零件应分别建档，避免净重与加工费口径混乱。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

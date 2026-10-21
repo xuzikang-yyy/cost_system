@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}采购成本核算 · 采购成本核价系统{% endblock %}
+{% block page_title %}采购成本核算{% endblock %}
+{% block breadcrumb %}业务处理 <span>/</span> 采购成本核算{% endblock %}
+
+{% block header_actions %}
+    <a href="{% url 'pricing:calc_export_all' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-download me-1"></i>导出记录
+    </a>
+    <a href="{% url 'pricing:calc_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>新建核价
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-calculator"></i>核价单</h2>
+            <div class="section-sub">每张核价单保存计算时的材料价格、规则版本与分项结果</div>
+        </div>
+        <div class="right">
+            <span class="chip"><i class="bi bi-archive"></i>共 {{ page.paginator.count }} 张</span>
+        </div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="input-group grow" style="max-width:300px">
+            <span class="input-group-text bg-white" style="border-color:var(--line-strong);font-size:12px"><i class="bi bi-search"></i></span>
+            <input type="text" name="q" value="{{ query }}" class="form-control border-start-0" placeholder="核价编号 / 零件编号 / 零件名称">
+        </div>
+        <select name="status" class="form-select">
+            <option value="">全部状态</option>
+            <option value="confirmed" {% if status == 'confirmed' %}selected{% endif %}>已确认</option>
+            <option value="draft" {% if status == 'draft' %}selected{% endif %}>草稿</option>
+        </select>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">筛选</button>
+        {% if query or status %}<a href="{% url 'pricing:calc_list' %}" class="btn btn-ghost btn-sm">清除</a>{% endif %}
+    </form>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:22%">核价单</th>
+                    <th>零件</th>
+                    <th class="text-end">材料单价（快照）</th>
+                    <th class="text-end">理论单位成本</th>
+                    <th class="text-end">参考报价</th>
+                    <th>核价人</th>
+                    <th>状态</th>
+                    <th class="actions">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for calc in calcs %}
+                    <tr>
+                        <td>
+                            <a class="cell-title" href="{% url 'pricing:calc_detail' calc.pk %}">{{ calc.calc_no }}</a>
+                            <div class="cell-sub">{{ calc.created_at|date:"Y-m-d H:i" }} · 规则 {{ calc.rule_version }}</div>
+                        </td>
+                        <td>
+                            <div class="cell-title" style="font-size:12.8px">{{ calc.part.name }}</div>
+                            <div class="cell-sub">{{ calc.part.code }} · {{ calc.part.material.name }}</div>
+                        </td>
+                        <td class="text-end num">
+                            ¥{{ calc.material_price|money:4 }}
+                            <div class="cell-sub">{{ calc.material_price_date|date:"Y-m-d" }}</div>
+                        </td>
+                        <td class="text-end num">¥{{ calc.unit_cost|money }}</td>
+                        <td class="text-end num strong">¥{{ calc.reference_price|money }}</td>
+                        <td class="cell-sub">{{ calc.created_by.get_full_name|default:calc.created_by.username }}</td>
+                        <td>
+                            {% if calc.status == 'confirmed' %}
+                                <span class="tag tag-green"><span class="dot-indicator"></span>已确认</span>
+                            {% else %}
+                                <span class="tag tag-gray">草稿</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <a href="{% url 'pricing:calc_detail' calc.pk %}" class="btn btn-ghost btn-sm">查看</a>
+                            <a href="{% url 'pricing:calc_export' calc.pk %}" class="btn btn-ghost btn-sm" title="导出 Excel"><i class="bi bi-file-earmark-excel"></i></a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                <i class="bi bi-calculator"></i>
+                                <h6>暂无核价记录</h6>
+                                <p>创建第一张核价单，系统将自动计算成本分项与参考报价。</p>
+                                <a href="{% url 'pricing:calc_create' %}" class="btn btn-primary btn-sm">新建核价</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "partials/pagination.html" with page=page %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.filter-bar select').forEach(function (el) {
+    el.addEventListener('change', function () { el.form.submit(); });
+});
+</script>
+{% endblock %}

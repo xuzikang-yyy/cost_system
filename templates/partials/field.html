@@ -1,0 +1,12 @@
+<div class="{% if wrapper_class %}{{ wrapper_class }}{% else %}mb-3{% endif %}">
+    <label class="form-label" for="{{ field.id_for_label }}">
+        {{ field.label }}{% if field.field.required %}<span class="required-star">*</span>{% endif %}
+    </label>
+    {{ field }}
+    {% if field.help_text %}
+        <div class="form-text">{{ field.help_text }}</div>
+    {% endif %}
+    {% for error in field.errors %}
+        <div class="invalid-feedback d-block">{{ error }}</div>
+    {% endfor %}
+</div>

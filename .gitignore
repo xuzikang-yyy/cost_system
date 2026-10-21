@@ -1,0 +1,13 @@
+.vendor/
+staticfiles/
+logs/
+deploy/bin/
+deploy/env.production
+__pycache__/
+*.pyc
+db.sqlite3
+db.sqlite3-journal
+db.sqlite3-wal
+db.sqlite3-shm
+.DS_Store
+backup/

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}{{ title }} · 采购成本核价系统{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> <a href="{% url 'pricing:material_list' %}" style="color:inherit">原材料与价格</a> <span>/</span> {{ title }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-layers"></i>{{ title }}</h2>
+                    <div class="section-sub">材料主数据只保存基础信息，价格按生效日期单独记录</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="form-grid">
+                        <div class="form-section-label">基础信息</div>
+                        {% include "partials/field.html" with field=form.code %}
+                        {% include "partials/field.html" with field=form.name %}
+                        {% include "partials/field.html" with field=form.material_type %}
+                        {% include "partials/field.html" with field=form.unit %}
+                        <div class="span-2">
+                            {% include "partials/field.html" with field=form.specification %}
+                        </div>
+                        <div class="span-2">
+                            {% include "partials/field.html" with field=form.remark %}
+                        </div>
+                        <div class="span-2">
+                            <div class="form-check">
+                                {{ form.status }}
+                                <label class="form-check-label" for="{{ form.status.id_for_label }}">启用该材料</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <a href="{% url 'pricing:material_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-info-circle"></i>设计说明</h2>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="alert-panel info mb-3">
+                    <i class="bi bi-lightbulb"></i>
+                    <div>为什么材料与价格要分表？铜只有一个材料档案，但不同日期的价格不同。分表保存可以避免最新价格覆盖历史，保证历史核价单可追溯。</div>
+                </div>
+                <div class="formula-box">
+                    材料投入量 = 成品净重 ÷ (1 − 损耗率)<br>
+                    材料成本 = 材料投入量 × 材料单价<br>
+                    废料回收 = 废料重量 × 废料单价
+                </div>
+                <div class="divider"></div>
+                <div class="cell-sub" style="line-height:1.9">
+                    材料单价录入后，核价单计算时会记录当时采用的价格与价格日期，后续材料调价不会改变已保存的核价结果。
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}零件信息 · 采购成本核价系统{% endblock %}
+{% block page_title %}零件信息{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> 零件信息{% endblock %}
+
+{% block header_actions %}
+    {% if user.is_superuser %}
+        <a href="{% url 'pricing:part_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>新增零件
+        </a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-box-seam"></i>待核价零件</h2>
+            <div class="section-sub">零件是成本核算与报价对比的业务主体，关联材料、净重与零件类别</div>
+        </div>
+        <div class="right">
+            <span class="chip"><i class="bi bi-diagram-3"></i>{{ rows|length }} 个零件</span>
+        </div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="input-group grow" style="max-width:300px">
+            <span class="input-group-text bg-white" style="border-color:var(--line-strong);font-size:12px"><i class="bi bi-search"></i></span>
+            <input type="text" name="q" value="{{ query }}" class="form-control border-start-0" placeholder="搜索零件编号、名称或规格">
+        </div>
+        <select name="category" class="form-select" style="max-width:150px">
+            <option value="">全部类别</option>
+            {% for value, label in categories %}
+                <option value="{{ value }}" {% if category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">筛选</button>
+        {% if query or category %}
+            <a href="{% url 'pricing:part_list' %}" class="btn btn-ghost btn-sm">清除</a>
+        {% endif %}
+    </form>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:30%">零件</th>
+                    <th>材料 / 净重</th>
+                    <th class="text-end">理论单位成本</th>
+                    <th class="text-end">核价参考报价</th>
+                    <th class="text-center">报价数</th>
+                    <th class="text-end">最低报价</th>
+                    <th class="actions">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="material-thumb {% if row.part.material.material_type == '铜' %}copper{% elif row.part.material.material_type == '铝' %}aluminum{% elif row.part.material.material_type == '塑料' %}plastic{% endif %}">
+                                    {{ row.part.category|slice:":1" }}
+                                </div>
+                                <div>
+                                    <a class="cell-title" href="{% url 'pricing:part_detail' row.part.pk %}">{{ row.part.name }}</a>
+                                    <div class="cell-sub">{{ row.part.code }}{% if row.part.specification %} · {{ row.part.specification }}{% endif %}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="cell-title" style="font-size:12.5px">{{ row.part.material.name }}</div>
+                            <div class="cell-sub num">{{ row.part.net_weight|money:4 }} kg</div>
+                        </td>
+                        <td class="text-end num">
+                            {% if row.calc %}¥{{ row.calc.unit_cost|money }}{% else %}<span class="text-muted-custom">未核价</span>{% endif %}
+                        </td>
+                        <td class="text-end num strong">
+                            {% if row.calc %}¥{{ row.calc.reference_price|money }}{% else %}<span class="text-muted-custom">—</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="tag {% if row.quote_count %}tag-blue{% else %}tag-gray{% endif %}">{{ row.quote_count }}</span>
+                        </td>
+                        <td class="text-end num">
+                            {% if row.quote_min %}¥{{ row.quote_min.normalized_price|money }}{% else %}<span class="text-muted-custom">—</span>{% endif %}
+                        </td>
+                        <td class="actions">
+                            <a href="{% url 'pricing:part_detail' row.part.pk %}" class="btn btn-ghost btn-sm">核价与报价</a>
+                            {% if user.is_superuser %}
+                                <a href="{% url 'pricing:part_edit' row.part.pk %}" class="btn btn-ghost btn-sm"><i class="bi bi-pencil"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="bi bi-box-seam"></i>
+                                <h6>暂无零件数据</h6>
+                                <p>请先创建原材料，再录入需要核价的零件。</p>
+                                {% if user.is_superuser %}
+                                    <a href="{% url 'pricing:part_create' %}" class="btn btn-primary btn-sm">新增零件</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · 采购成本核价系统{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> <a href="{% url 'pricing:supplier_list' %}" style="color:inherit">供应商档案</a> <span>/</span> {{ title }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-truck"></i>{{ title }}</h2>
+                    <div class="section-sub">供应商状态参与对比展示，停用供应商不会出现在新报价的默认选择中</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="form-grid">
+                        <div class="form-section-label">基本信息</div>
+                        {% include "partials/field.html" with field=form.code %}
+                        {% include "partials/field.html" with field=form.name %}
+                        {% include "partials/field.html" with field=form.category %}
+                        {% include "partials/field.html" with field=form.status %}
+                        <div class="form-section-label">联系方式</div>
+                        {% include "partials/field.html" with field=form.contact %}
+                        {% include "partials/field.html" with field=form.phone %}
+                        <div class="span-2">
+                            {% include "partials/field.html" with field=form.remark %}
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <a href="{% url 'pricing:supplier_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div><h2 class="section-title"><i class="bi bi-info-circle"></i>供应商状态</h2></div>
+            </div>
+            <div class="panel-body">
+                <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--line)">
+                    <span class="tag tag-green">合格</span><span class="cell-sub">可正常参与询价与报价对比</span>
+                </div>
+                <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--line)">
+                    <span class="tag tag-amber">观察</span><span class="cell-sub">可报价，但异常报价需重点核查</span>
+                </div>
+                <div class="d-flex justify-content-between py-2">
+                    <span class="tag tag-gray">停用</span><span class="cell-sub">保留历史报价记录，不再新增询价</span>
+                </div>
+                <div class="alert-panel info mt-3">
+                    <i class="bi bi-lightbulb"></i>
+                    <div>报价偏差只反映价格水平，不能单独作为供应商淘汰依据，还需结合质量合格率与交付表现。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

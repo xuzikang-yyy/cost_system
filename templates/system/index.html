@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}系统设置 · 采购成本核价系统{% endblock %}
+{% block page_title %}系统设置{% endblock %}
+{% block breadcrumb %}系统 <span>/</span> 系统设置{% endblock %}
+
+{% block header_actions %}
+    <a href="{% url 'pricing:user_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-person-plus me-1"></i>新增用户
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-xl-5">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-gear"></i>核价默认参数</h2>
+                    <div class="section-sub">仅作为新建核价时的默认值，不追溯修改历史核价单</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+                    <div class="form-grid">
+                        <div class="span-2">{% include "partials/field.html" with field=form.company_name %}</div>
+                        {% include "partials/field.html" with field=form.default_markup_rate %}
+                        {% include "partials/field.html" with field=form.usd_rate %}
+                        {% include "partials/field.html" with field=form.default_deviation_low %}
+                        {% include "partials/field.html" with field=form.default_deviation_high %}
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-4">保存系统参数</button>
+                    <div class="cell-sub mt-2">最近更新：{{ settings.updated_at|date:"Y-m-d H:i" }}</div>
+                </form>
+                <div class="alert-panel info mt-3">
+                    <i class="bi bi-info-circle"></i>
+                    <div>实际核价使用的加成率与偏差阈值来自成本规则；这里的默认值用于新建规则或快速参考。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-7">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-people"></i>系统用户</h2>
+                    <div class="section-sub">管理员可维护基础数据与用户；核价人员可录入核价单和报价</div>
+                </div>
+                <div class="right"><span class="chip"><i class="bi bi-person"></i>{{ users|length }} 个账号</span></div>
+            </div>
+            <div class="panel-body tight">
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>账号</th>
+                                <th>姓名</th>
+                                <th>角色</th>
+                                <th>状态</th>
+                                <th>最近登录</th>
+                                <th class="actions">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in users %}
+                                <tr>
+                                    <td class="fw-600">{{ item.username }}{% if item == user %}<span class="tag tag-blue ms-1">当前</span>{% endif %}</td>
+                                    <td>{{ item.first_name|default:"—" }}</td>
+                                    <td>
+                                        {% if item.is_superuser %}
+                                            <span class="tag tag-gold">管理员</span>
+                                        {% else %}
+                                            <span class="tag tag-gray">核价人员</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.is_active %}
+                                            <span class="tag tag-green"><span class="dot-indicator"></span>启用</span>
+                                        {% else %}
+                                            <span class="tag tag-gray">停用</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="cell-sub num">{{ item.last_login|date:"Y-m-d H:i"|default:"从未登录" }}</td>
+                                    <td class="actions">
+                                        <a href="{% url 'pricing:user_edit' item.pk %}" class="btn btn-ghost btn-sm"><i class="bi bi-pencil"></i> 编辑</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-shield-lock"></i>角色与权限边界</h2>
+            <div class="section-sub">第一版采用两级角色，满足核价业务的最小权限要求</div>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="tag tag-gold">管理员</span>
+                    <span class="cell-sub">全量数据维护</span>
+                </div>
+                <div class="cell-sub" style="line-height:2">
+                    维护原材料、材料价格、零件、成本规则、供应商<br>
+                    新增与编辑系统用户、维护系统参数<br>
+                    录入/确认核价单、录入报价、删除报价<br>
+                    导出核价单与核价记录
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="tag tag-blue">核价人员</span>
+                    <span class="cell-sub">业务数据录入</span>
+                </div>
+                <div class="cell-sub" style="line-height:2">
+                    查看全部基础数据与规则（只读）<br>
+                    新建、查看、确认核价单<br>
+                    录入与编辑供应商报价<br>
+                    查看分析图表并导出报表
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

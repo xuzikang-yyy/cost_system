@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · 采购成本核价系统{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> <a href="{% url 'pricing:rule_list' %}" style="color:inherit">成本规则</a> <span>/</span> {{ title }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-sliders"></i>{{ title }}</h2>
+                    <div class="section-sub">所有参数均按百分比或元/件填写，保存后供同类零件核价匹配</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="form-grid">
+                        <div class="form-section-label">规则标识</div>
+                        {% include "partials/field.html" with field=form.name %}
+                        {% include "partials/field.html" with field=form.category %}
+                        {% include "partials/field.html" with field=form.version %}
+                        {% include "partials/field.html" with field=form.effective_date %}
+
+                        <div class="form-section-label">损耗与费用（元 / 件）</div>
+                        {% include "partials/field.html" with field=form.loss_rate %}
+                        {% include "partials/field.html" with field=form.processing_fee %}
+                        {% include "partials/field.html" with field=form.outsourcing_fee %}
+                        {% include "partials/field.html" with field=form.packaging_fee %}
+                        {% include "partials/field.html" with field=form.overhead_fee %}
+                        {% include "partials/field.html" with field=form.scrap_price %}
+
+                        <div class="form-section-label">报价判定</div>
+                        {% include "partials/field.html" with field=form.markup_rate %}
+                        <div></div>
+                        {% include "partials/field.html" with field=form.deviation_low %}
+                        {% include "partials/field.html" with field=form.deviation_high %}
+                        <div class="span-2">
+                            {% include "partials/field.html" with field=form.remark %}
+                        </div>
+                        <div class="span-2">
+                            <div class="form-check">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">启用该规则（同类零件将匹配最新生效版本）</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">保存规则</button>
+                        <a href="{% url 'pricing:rule_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div><h2 class="section-title"><i class="bi bi-lightbulb"></i>参数建议</h2></div>
+            </div>
+            <div class="panel-body">
+                <div class="alert-panel mb-3">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>损耗率口径为“损耗量占材料投入量的比例”，因此分母使用 1 − 损耗率，而不是 1 + 损耗率。</div>
+                </div>
+                <div class="cell-sub" style="line-height:1.9">
+                    铜件加工费通常高于塑料件；表面处理（如电镀、喷涂）建议放在外协及表面处理费中单独体现。<br><br>
+                    偏差区间代表可接受的报价波动范围，超出后系统标记偏高或偏低，但仍需采购人员结合交期与质量判断。
+                </div>
+                <div class="formula-box mt-3">
+                    参考报价 = 理论成本 × (1 + 加成率)<br>
+                    偏差率 = (报价 − 参考价) ÷ 参考价 × 100%
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

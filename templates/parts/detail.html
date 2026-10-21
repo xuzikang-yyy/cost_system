@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}{{ part.name }} · 核价与报价{% endblock %}
+{% block page_title %}核价与报价对比{% endblock %}
+{% block breadcrumb %}零件信息 <span>/</span> <a href="{% url 'pricing:part_list' %}" style="color:inherit">零件档案</a> <span>/</span> {{ part.name }}{% endblock %}
+
+{% block header_actions %}
+    <a href="{% url 'pricing:quote_create' %}?part={{ part.pk }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>录入报价
+    </a>
+    <a href="{% url 'pricing:calc_create' %}?part={{ part.pk }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-calculator me-1"></i>重新核价
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <div class="panel-body">
+        <div class="d-flex align-items-start gap-3 flex-wrap">
+            <div class="material-thumb {% if part.material.material_type == '铜' %}copper{% elif part.material.material_type == '铝' %}aluminum{% elif part.material.material_type == '塑料' %}plastic{% endif %}" style="width:46px;height:46px;font-size:13px;flex-basis:46px">
+                {{ part.material.material_type }}
+            </div>
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h2 class="section-title" style="font-size:18px">{{ part.name }}</h2>
+                    <span class="tag tag-blue">{{ part.code }}</span>
+                    <span class="tag tag-gray">{{ part.category }}</span>
+                    {% if not part.status %}<span class="tag tag-red">已停用</span>{% endif %}
+                </div>
+                <div class="cell-sub mt-1">{{ part.material.name }} · {{ part.specification|default:"未填写规格" }}{% if part.drawing_no %} · 图号 {{ part.drawing_no }}{% endif %}</div>
+            </div>
+            <div class="d-flex gap-3 align-items-center">
+                <div class="text-end">
+                    <div class="cell-sub">成品净重</div>
+                    <div class="num fw-600" style="font-size:17px">{{ part.net_weight|money:4 }} <small style="font-size:11px">kg</small></div>
+                </div>
+                {% if user.is_superuser %}
+                    <a href="{% url 'pricing:part_edit' part.pk %}" class="btn btn-ghost btn-sm"><i class="bi bi-pencil"></i> 编辑</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if calc %}
+<div class="summary-strip mt-3">
+    <div class="summary-cell">
+        <div class="label">理论单位成本</div>
+        <div class="value">¥{{ calc.unit_cost|money }}</div>
+    </div>
+    <div class="summary-cell highlight">
+        <div class="label">核价参考报价（不含税）</div>
+        <div class="value">¥{{ calc.reference_price|money }} <small>+{{ calc.markup_rate|money }}%</small></div>
+    </div>
+    <div class="summary-cell">
+        <div class="label">合理报价区间</div>
+        <div class="value" style="font-size:16px">
+            {{ calc.reference_price|adjust:calc.deviation_low|money }}
+            <span class="text-muted-custom" style="font-weight:400;font-size:12px">~</span>
+            {{ calc.reference_price|adjust:calc.deviation_high|money }}
+        </div>
+        <div class="cell-sub">按 {{ calc.deviation_low|signed }}% ~ {{ calc.deviation_high|signed }}% 判定</div>
+    </div>
+    <div class="summary-cell">
+        <div class="label">在册报价 / 平均偏差</div>
+        <div class="value" style="font-size:16px">
+            {{ rows|length }} 家
+            {% if avg_rate is not None %}<span class="text-muted-custom" style="font-weight:400;font-size:12px">· 平均 {{ avg_rate|signed }}%</span>{% endif %}
+        </div>
+        <div class="cell-sub">基准：{{ calc.calc_no }} · {{ calc.created_at|date:"Y-m-d" }}</div>
+    </div>
+</div>
+
+{% if abnormal %}
+    <div class="alert-panel {% if abnormal.0.metric.level == 'high' %}danger{% endif %} mt-3">
+        <i class="bi bi-exclamation-triangle"></i>
+        <div>
+            当前有 <strong>{{ abnormal|length }}</strong> 条报价超出合理区间：
+            {% for row in abnormal|slice:":3" %}
+                {{ row.quote.supplier.name }}（{{ row.metric.rate|signed }}%）{% if not forloop.last %}、{% endif %}
+            {% endfor %}
+            ，建议结合交期、质量与历史合作情况进一步核查。
+        </div>
+    </div>
+{% endif %}
+
+<div class="card-panel mt-3">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-bar-chart"></i>供应商报价分布</h2>
+            <div class="section-sub">统一换算为人民币、含税、元/件口径；红色虚线为核价参考报价</div>
+        </div>
+        <div class="right">
+            <span class="chip"><i class="bi bi-bullseye"></i>参考价 ¥{{ calc.reference_price|money }}</span>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div id="quoteChart" class="chart" style="height:250px"></div>
+    </div>
+</div>
+
+<div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-list-ol"></i>报价对比明细</h2>
+                    <div class="section-sub">按偏差率从低到高排序，排名越前报价越低</div>
+                </div>
+                <div class="right">
+                    <a href="{% url 'pricing:quote_list' %}?q={{ part.code }}" class="btn btn-ghost btn-sm">报价台账 <i class="bi bi-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="panel-body tight">
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th style="width:36px">#</th>
+                                <th style="min-width:150px">供应商 / 日期</th>
+                                <th class="text-end">原始报价</th>
+                                <th class="text-end">统一口径</th>
+                                <th class="text-end">偏差 / 偏差率</th>
+                                <th class="actions"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in rows %}
+                                <tr>
+                                    <td><span class="quote-rank {% if forloop.counter == 1 %}top{% endif %}">{{ row.rank }}</span></td>
+                                    <td>
+                                        <div class="cell-title">{{ row.quote.supplier.name }}</div>
+                                        <div class="cell-sub" style="white-space:nowrap">{{ row.quote.quote_date|date:"Y-m-d" }} · 交期 {{ row.quote.lead_time_days }} 天</div>
+                                    </td>
+                                    <td class="text-end num">
+                                        {{ row.quote.unit_price|money }}
+                                        <div class="cell-sub" style="white-space:nowrap">{{ row.quote.get_price_unit_display }}{% if row.quote.currency == 'USD' %} · USD{% endif %}</div>
+                                    </td>
+                                    <td class="text-end num strong">¥{{ row.quote.normalized_price|money }}</td>
+                                    <td class="text-end num">
+                                        <span class="{% if row.metric.deviation > 0 %}text-danger-custom{% elif row.metric.deviation < 0 %}text-success-custom{% endif %}">{{ row.metric.deviation|signed }}</span>
+                                        <div class="mt-1">
+                                            <span class="tag tag-{% if row.metric.level == 'high' %}red{% elif row.metric.level == 'low' %}amber{% elif row.metric.level == 'normal' %}green{% else %}gray{% endif %}">{{ row.metric.rate|signed }}% · {{ row.metric.label }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="actions">
+                                        <a href="{% url 'pricing:quote_edit' row.quote.pk %}" class="btn btn-ghost btn-sm" title="编辑报价"><i class="bi bi-pencil"></i></a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="empty-state">
+                                            <i class="bi bi-file-earmark-plus"></i>
+                                            <h6>还没有供应商报价</h6>
+                                            <p>录入报价后，系统会自动计算与参考报价的偏差。</p>
+                                            <a href="{% url 'pricing:quote_create' %}?part={{ part.pk }}" class="btn btn-primary btn-sm">录入第一条报价</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+<div class="row g-3 mt-0">
+    <div class="col-xl-7">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-receipt"></i>成本拆解</h2>
+                    <div class="section-sub">{{ calc.calc_no }} · 规则 {{ calc.rule_version }}</div>
+                </div>
+                <div class="right">
+                    <a href="{% url 'pricing:calc_detail' calc.pk %}" class="btn btn-ghost btn-sm">详情 <i class="bi bi-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="panel-body">
+                {% for label, amount in calc.cost_items %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1" style="font-size:12.5px">
+                            <span class="text-muted-custom">{{ label }}</span>
+                            <span class="num fw-600">¥{{ amount|money }}</span>
+                        </div>
+                        <div class="progress-track">
+                            <span style="width:{{ amount|div:calc.total_positive_cost|percent }}"></span>
+                        </div>
+                    </div>
+                {% endfor %}
+                <div class="divider"></div>
+                <div class="d-flex justify-content-between" style="font-size:12.5px">
+                    <span class="text-muted-custom">废料回收（减项）</span>
+                    <span class="num" style="color:var(--success)">−¥{{ calc.scrap_recovery|money }}</span>
+                </div>
+                <div class="d-flex justify-content-between mt-2" style="font-size:13px">
+                    <span class="fw-600">理论单位成本</span>
+                    <span class="num fw-600">¥{{ calc.unit_cost|money }}</span>
+                </div>
+                <div class="alert-panel info mt-3">
+                    <i class="bi bi-info-circle"></i>
+                    <div>材料单价 ¥{{ calc.material_price|money:4 }}/kg（{{ calc.material_price_date|date:"Y-m-d" }}），损耗率 {{ calc.loss_rate|money }}%，材料投入 {{ calc.material_input_weight|money:4 }} kg。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-5">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-clock-history"></i>核价历史</h2>
+                    <div class="section-sub">每次核价均保留参数快照</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <ul class="timeline">
+                    {% for item in history %}
+                        <li class="{% if forloop.counter == 1 %}current{% endif %}">
+                            <div class="tl-title">
+                                <a href="{% url 'pricing:calc_detail' item.pk %}">{{ item.calc_no }}</a>
+                                <span class="tag {% if item.status == 'confirmed' %}tag-green{% else %}tag-gray{% endif %}" style="margin-left:4px">{{ item.status_label }}</span>
+                            </div>
+                            <div class="tl-meta">{{ item.created_at|date:"Y-m-d H:i" }} · 参考价 ¥{{ item.reference_price|money }} · {{ item.created_by.get_full_name|default:item.created_by.username }}</div>
+                        </li>
+                    {% empty %}
+                        <li>
+                            <div class="tl-title">暂无其他核价记录</div>
+                            <div class="tl-meta">当前核价单为最新记录</div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card-panel mt-3">
+    <div class="panel-body">
+        <div class="empty-state">
+            <i class="bi bi-calculator"></i>
+            <h6>该零件尚未完成核价</h6>
+            <p>先完成一次成本核算，系统才能生成参考报价并判断供应商报价是否合理。</p>
+            <a href="{% url 'pricing:calc_create' %}?part={{ part.pk }}" class="btn btn-primary">开始核价</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if calc %}
+{{ chart|json_script:"part-chart" }}
+<script>
+(function () {
+    const data = JSON.parse(document.getElementById('part-chart').textContent);
+    const levelColor = { high: '#b8433c', low: '#c1842f', normal: '#17617c', unknown: '#9aa8b3' };
+    CostUI.makeChart('quoteChart', CostUI.barOption({
+        labels: data.suppliers,
+        values: data.quotes,
+        colors: data.levels.map(function (level) { return levelColor[level] || '#9aa8b3'; }),
+        horizontal: false,
+        reference: data.reference,
+        showLabel: true,
+        labelFormat: function (params) { return '¥' + Number(params.value).toFixed(2); },
+        barMaxWidth: 46
+    }));
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}登录审计 · 采购成本核价系统{% endblock %}
+{% block page_title %}登录审计{% endblock %}
+{% block breadcrumb %}系统 <span>/</span> 登录审计{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-shield-check"></i>登录记录</h2>
+            <div class="section-sub">记录每次登录成功、登录失败与退出，含客户端 IP 与设备</div>
+        </div>
+        <form class="d-flex gap-2" method="get">
+            <input type="text" name="q" value="{{ query }}" class="form-control form-control-sm" style="width:180px" placeholder="搜索账号 / IP">
+            <select name="event" class="form-select form-select-sm" style="width:130px">
+                <option value="">全部事件</option>
+                <option value="login" {% if event == "login" %}selected{% endif %}>登录成功</option>
+                <option value="failed" {% if event == "failed" %}selected{% endif %}>登录失败</option>
+                <option value="logout" {% if event == "logout" %}selected{% endif %}>退出登录</option>
+            </select>
+            <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-search"></i> 查询</button>
+        </form>
+    </div>
+    <div class="panel-body tight">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>事件</th>
+                        <th>账号</th>
+                        <th>客户端 IP</th>
+                        <th>设备 / User-Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            <td class="cell-sub num">{{ row.created_at|date:"Y-m-d H:i:s" }}</td>
+                            <td>
+                                {% if row.event == "login" %}
+                                    <span class="tag tag-green">登录成功</span>
+                                {% elif row.event == "failed" %}
+                                    <span class="tag tag-red">登录失败</span>
+                                {% else %}
+                                    <span class="tag tag-gray">退出登录</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-600">{{ row.username|default:"—" }}</td>
+                            <td class="num">{{ row.ip|default:"—" }}</td>
+                            <td class="cell-sub" style="max-width:340px;word-break:break-all">{{ row.user_agent|default:"—" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state" style="padding:30px">
+                                    <i class="bi bi-shield-check"></i>
+                                    <h6>暂无登录记录</h6>
+                                    <p>系统启用审计后，登录与退出事件会在此显示。</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "partials/pagination.html" %}
+    </div>
+</div>
+{% endblock %}

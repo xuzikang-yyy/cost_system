@@ -1,0 +1,27 @@
+{% load pricing_extras %}
+{% if page.has_other_pages %}
+<nav class="d-flex align-items-center justify-content-between px-3 py-3 border-top" style="border-color:var(--line)!important">
+    <span class="text-muted-custom" style="font-size:11.5px">
+        第 {{ page.number }} / {{ page.paginator.num_pages }} 页 · 共 {{ page.paginator.count }} 条
+    </span>
+    <ul class="pagination pagination-sm">
+        {% if page.has_previous %}
+            <li class="page-item"><a class="page-link" href="?{% querystring page=page.previous_page_number %}">上一页</a></li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">上一页</span></li>
+        {% endif %}
+        {% for number in page.paginator.page_range %}
+            {% if number == page.number %}
+                <li class="page-item active"><span class="page-link">{{ number }}</span></li>
+            {% elif number > page.number|add:-3 and number < page.number|add:3 %}
+                <li class="page-item"><a class="page-link" href="?{% querystring page=number %}">{{ number }}</a></li>
+            {% endif %}
+        {% endfor %}
+        {% if page.has_next %}
+            <li class="page-item"><a class="page-link" href="?{% querystring page=page.next_page_number %}">下一页</a></li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">下一页</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}

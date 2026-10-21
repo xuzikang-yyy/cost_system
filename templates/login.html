@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>登录 · 制造采购成本核价系统</title>
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<div class="login-page">
+    <section class="login-visual">
+        <div class="login-brand">
+            <div class="brand-mark">核</div>
+            <div>
+                <div class="brand-name" style="font-size:17px">制造采购成本核价系统</div>
+                <div class="brand-sub">Procurement Cost Verification</div>
+            </div>
+        </div>
+
+        <div class="login-headline" style="margin-top:auto">
+            把每一次<span>报价</span>，<br>还原成可解释的成本。
+        </div>
+        <p class="login-desc">
+            从原材料价格、损耗与加工费出发，建立统一的成本口径；
+            将供应商报价与核价参考价对齐，让采购判断有据可查。
+        </p>
+
+        <div class="formula-card">
+            <h6>核心核价模型</h6>
+            <div class="formula-line">材料投入量 = 成品净重 ÷ (1 − <em>损耗率</em>)</div>
+            <div class="formula-line">理论成本 = 材料 + 加工 + 外协 + 包装 + 制造费用 − 废料回收</div>
+            <div class="formula-line">核价参考价 = 理论成本 × (1 + <em>合理加成率</em>)</div>
+        </div>
+
+        <div class="login-foot">
+            <span>Web · Django · MySQL</span>
+            <span>成本分项 · 报价偏差 · 历史追溯</span>
+        </div>
+    </section>
+
+    <section class="login-form-side">
+        <div class="login-card">
+            <h2>登录核价工作台</h2>
+            <p class="sub">请使用采购部门分配的账号登录</p>
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger" style="font-size:12.5px">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <span>账号或密码不正确，请重新输入。</span>
+                </div>
+            {% endif %}
+
+            <form method="post" action="">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">登录账号</label>
+                    <div class="position-relative">
+                        {{ form.username }}
+                        <i class="bi bi-person" style="position:absolute;right:12px;top:14px;color:#9aa8b3"></i>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">登录密码</label>
+                    <div class="position-relative">
+                        {{ form.password }}
+                        <i class="bi bi-shield-lock" style="position:absolute;right:12px;top:14px;color:#9aa8b3"></i>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mt-2">
+                    进入系统 <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </form>
+        </div>
+    </section>
+</div>
+<script src="{% static 'vendor/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

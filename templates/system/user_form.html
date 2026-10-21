@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · 采购成本核价系统{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block breadcrumb %}系统 <span>/</span> <a href="{% url 'pricing:system' %}" style="color:inherit">系统设置</a> <span>/</span> {{ title }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-person-gear"></i>{{ title }}</h2>
+                    <div class="section-sub">账号用于登录系统，角色决定数据维护权限</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+                    <div class="form-grid">
+                        {% if edit_user %}
+                            <div class="span-2">
+                                <div class="meta-item" style="border:1px solid var(--line);border-radius:7px">
+                                    <div class="meta-label">登录账号</div>
+                                    <div class="meta-value">{{ edit_user.username }}</div>
+                                </div>
+                            </div>
+                            <div class="span-2">{% include "partials/field.html" with field=form.display_name %}</div>
+                            <div class="span-2">{% include "partials/field.html" with field=form.role %}</div>
+                            <div class="span-2">
+                                <div class="form-check">
+                                    {{ form.is_active }}
+                                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">启用该账号</label>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="span-2">{% include "partials/field.html" with field=form.username %}</div>
+                            <div class="span-2">{% include "partials/field.html" with field=form.display_name %}</div>
+                            <div class="span-2">{% include "partials/field.html" with field=form.password %}</div>
+                            <div class="span-2">{% include "partials/field.html" with field=form.role %}</div>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">{% if edit_user %}保存修改{% else %}创建账号{% endif %}</button>
+                        <a href="{% url 'pricing:system' %}" class="btn btn-outline-secondary">返回</a>
+                    </div>
+                </form>
+                <div class="alert-panel info mt-3">
+                    <i class="bi bi-info-circle"></i>
+                    <div>{% if edit_user %}管理员可调整姓名、角色与启用状态；降低角色或停用账号后，该用户将立即失去对应权限。{% else %}初始密码由管理员设置，建议首次登录后由用户自行修改。密码至少 6 位，避免使用纯数字或账号同名。{% endif %}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div><h2 class="section-title"><i class="bi bi-shield-check"></i>角色说明</h2></div>
+            </div>
+            <div class="panel-body">
+                <div class="mb-3">
+                    <span class="tag tag-gold">管理员</span>
+                    <div class="cell-sub mt-2" style="line-height:1.9">可维护全部基础数据、成本规则、供应商与系统用户，可删除报价记录，并确认核价单。</div>
+                </div>
+                <div class="mb-3">
+                    <span class="tag tag-blue">核价人员</span>
+                    <div class="cell-sub mt-2" style="line-height:1.9">可查看基础数据，创建核价单、录入供应商报价、查看分析与导出报表；不能修改规则与用户。</div>
+                </div>
+                <div class="alert-panel">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>不要多人共用同一账号，否则核价单的“核价人”与报价录入记录将无法追溯。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

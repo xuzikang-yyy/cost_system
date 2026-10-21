@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}历史与分析 · 采购成本核价系统{% endblock %}
+{% block page_title %}历史与分析{% endblock %}
+{% block breadcrumb %}业务处理 <span>/</span> 历史与分析{% endblock %}
+
+{% block header_actions %}
+    <a href="{% url 'pricing:calc_export_all' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-download me-1"></i>导出核价记录
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <div class="kpi-label">参与分析报价</div>
+            <div class="kpi-icon"><i class="bi bi-file-earmark-text"></i></div>
+        </div>
+        <div class="kpi-value">{{ quote_total }}<small>条</small></div>
+        <div class="kpi-foot">覆盖 {{ part_count }} 个有报价的零件</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <div class="kpi-label">平均绝对偏差</div>
+            <div class="kpi-icon gold"><i class="bi bi-activity"></i></div>
+        </div>
+        <div class="kpi-value">{{ avg_abs|money }}<small>%</small></div>
+        <div class="kpi-foot">报价与参考报价的平均偏离程度</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <div class="kpi-label">异常报价占比</div>
+            <div class="kpi-icon {% if abnormal_count %}danger{% endif %}"><i class="bi bi-exclamation-triangle"></i></div>
+        </div>
+        <div class="kpi-value {% if abnormal_count %}text-danger-custom{% endif %}">{{ abnormal_pct|money }}<small>%</small></div>
+        <div class="kpi-foot">{{ abnormal_count }} 条超出合理区间</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <div class="kpi-label">合格供应商</div>
+            <div class="kpi-icon"><i class="bi bi-truck"></i></div>
+        </div>
+        <div class="kpi-value">{{ supplier_count }}<small>家</small></div>
+        <div class="kpi-foot">状态为“合格”的供应商</div>
+    </div>
+</div>
+
+<form method="get" class="filter-bar card-panel mb-3" style="border-radius:10px">
+    <span class="fw-600" style="font-size:12.5px">零件类别</span>
+    <select name="category" class="form-select" onchange="this.form.submit()">
+        <option value="">全部类别</option>
+        {% for value, label in categories %}
+            <option value="{{ value }}" {% if category == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% if category %}<a href="{% url 'pricing:analysis' %}" class="btn btn-ghost btn-sm">清除筛选</a>{% endif %}
+    <span class="ms-auto cell-sub"><i class="bi bi-info-circle me-1"></i>图表基于最新已确认核价单计算</span>
+</form>
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-graph-up"></i>原材料价格趋势</h2>
+                    <div class="section-sub">近 12 个月月末生效价格，单位：元 / 千克</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="trendChart" class="chart chart-lg"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-distribute-vertical"></i>报价偏差分布</h2>
+                    <div class="section-sub">观察报价整体是偏高还是偏低</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="histChart" class="chart chart-lg"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-0">
+    <div class="col-xl-6">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-people"></i>供应商报价稳定性</h2>
+                    <div class="section-sub">平均绝对偏差越低，报价越贴近核价参考</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="supplierChart" class="chart chart-lg"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-layers-half"></i>零件成本结构对比</h2>
+                    <div class="section-sub">最新核价单分项构成，单位：元 / 件</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="costChart" class="chart chart-lg"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-table"></i>零件级核价与报价汇总</h2>
+            <div class="section-sub">按平均偏差绝对值降序排列，优先关注偏离较大的零件</div>
+        </div>
+    </div>
+    <div class="panel-body tight">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:26%">零件</th>
+                        <th class="text-end">参考报价</th>
+                        <th class="text-center">报价家数</th>
+                        <th class="text-end">平均偏差率</th>
+                        <th class="text-end">偏差区间</th>
+                        <th class="text-end">最低报价</th>
+                        <th class="actions">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in comparison %}
+                        <tr>
+                            <td>
+                                <a class="cell-title" href="{% url 'pricing:part_detail' item.part.pk %}">{{ item.part.name }}</a>
+                                <div class="cell-sub">{{ item.part.code }} · {{ item.part.material.name }}</div>
+                            </td>
+                            <td class="text-end num">{% if item.calc %}¥{{ item.calc.reference_price|money }}{% else %}—{% endif %}</td>
+                            <td class="text-center"><span class="tag tag-blue">{{ item.quote_count }}</span></td>
+                            <td class="text-end num fw-600 {% if item.avg_rate > 0 %}text-danger-custom{% elif item.avg_rate < 0 %}text-success-custom{% endif %}">
+                                {% if item.avg_rate is not None %}{{ item.avg_rate|signed }}%{% else %}—{% endif %}
+                            </td>
+                            <td class="text-end num cell-sub">
+                                {% if item.min_rate is not None %}{{ item.min_rate|signed }}% ~ {{ item.max_rate|signed }}%{% else %}—{% endif %}
+                            </td>
+                            <td class="text-end num">{% if item.min_quote %}¥{{ item.min_quote.normalized_price|money }}{% else %}—{% endif %}</td>
+                            <td class="actions">
+                                <a href="{% url 'pricing:part_detail' item.part.pk %}" class="btn btn-ghost btn-sm">查看对比 <i class="bi bi-arrow-right"></i></a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="bi bi-bar-chart"></i>
+                                    <h6>可分析的数据不足</h6>
+                                    <p>至少需要一个完成核价且录入报价的零件。</p>
+                                    <a href="{% url 'pricing:calc_create' %}" class="btn btn-primary btn-sm">新建核价</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ chart|json_script:"analysis-chart" }}
+<script>
+(function () {
+    const data = JSON.parse(document.getElementById('analysis-chart').textContent);
+
+    CostUI.makeChart('trendChart', CostUI.lineOption({
+        labels: data.trend.labels,
+        series: data.trend.series,
+        area: false
+    }));
+
+    CostUI.makeChart('histChart', CostUI.barOption({
+        labels: data.hist.labels,
+        values: data.hist.values,
+        colors: ['#8aa8b6', '#6b93a6', '#4f7f94', '#c1842f', '#bb6a52', '#b8433c'],
+        showLabel: true,
+        barMaxWidth: 40
+    }));
+
+    const perf = data.suppliers;
+    CostUI.makeChart('supplierChart', CostUI.barOption({
+        labels: perf.labels,
+        values: perf.values,
+        horizontal: true,
+        showLabel: true,
+        labelFormat: function (params) { return Number(params.value).toFixed(2) + '%'; },
+        colors: perf.values.map(function (value) {
+            return value <= 5 ? '#4f8f7b' : (value <= 10 ? '#c1842f' : '#b8433c');
+        }),
+        barMaxWidth: 20
+    }));
+
+    const cost = data.cost;
+    const names = cost.map(function (item) { return item.name; });
+    const chart = CostUI.makeChart('costChart', {
+        grid: { left: 8, right: 14, top: 34, bottom: 4, containLabel: true },
+        legend: { top: 0, right: 0, icon: 'roundRect', itemWidth: 9, itemHeight: 9, textStyle: { color: '#6c7a86', fontSize: 11 } },
+        tooltip: Object.assign({ trigger: 'axis', axisPointer: { type: 'shadow' } }, CostUI.baseTooltip),
+        xAxis: {
+            type: 'category', data: names,
+            axisTick: { show: false },
+            axisLine: { lineStyle: { color: '#e6ebef' } },
+            axisLabel: { color: '#8b98a3', fontSize: 10, interval: 0, rotate: names.length > 5 ? 18 : 0 }
+        },
+        yAxis: {
+            type: 'value',
+            axisLine: { show: false },
+            axisLabel: { color: '#8b98a3', fontSize: 11 },
+            splitLine: { lineStyle: { color: '#e6ebef', type: 'dashed' } }
+        },
+        series: [
+            { name: '材料成本', type: 'bar', stack: 'total', barMaxWidth: 34, data: cost.map(function (i) { return i.material; }), itemStyle: { color: '#17617c' } },
+            { name: '加工与外协', type: 'bar', stack: 'total', data: cost.map(function (i) { return i.processing; }), itemStyle: { color: '#c1842f' } },
+            { name: '其他费用', type: 'bar', stack: 'total', data: cost.map(function (i) { return i.other; }), itemStyle: { color: '#9fb3bf', borderRadius: [4, 4, 0, 0] } }
+        ]
+    });
+})();
+</script>
+{% endblock %}

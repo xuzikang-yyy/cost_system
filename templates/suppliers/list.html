@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}供应商档案 · 采购成本核价系统{% endblock %}
+{% block page_title %}供应商档案{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> 供应商档案{% endblock %}
+
+{% block header_actions %}
+    {% if user.is_superuser %}
+        <a href="{% url 'pricing:supplier_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>新增供应商
+        </a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="section-title"><i class="bi bi-truck"></i>供应商名录</h2>
+            <div class="section-sub">供应商报价参与偏差分析，平均偏差可作为询价对象筛选的辅助依据</div>
+        </div>
+        <div class="right">
+            <span class="chip"><i class="bi bi-people"></i>{{ rows|length }} 家供应商</span>
+        </div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="input-group grow" style="max-width:300px">
+            <span class="input-group-text bg-white" style="border-color:var(--line-strong);font-size:12px"><i class="bi bi-search"></i></span>
+            <input type="text" name="q" value="{{ query }}" class="form-control border-start-0" placeholder="搜索供应商编号、名称或联系人">
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">查询</button>
+        {% if query %}<a href="{% url 'pricing:supplier_list' %}" class="btn btn-ghost btn-sm">清除</a>{% endif %}
+    </form>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:30%">供应商</th>
+                    <th>供应类别</th>
+                    <th>联系人</th>
+                    <th>状态</th>
+                    <th class="text-center">报价数</th>
+                    <th class="text-end">平均绝对偏差</th>
+                    <th class="text-center">异常次数</th>
+                    <th class="actions">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="material-thumb" style="background:#eef3f6;color:#4d6573">{{ row.supplier.name|slice:":1" }}</div>
+                                <div>
+                                    <div class="cell-title">{{ row.supplier.name }}</div>
+                                    <div class="cell-sub">{{ row.supplier.code }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="tag tag-gray">{{ row.supplier.category }}</span></td>
+                        <td>
+                            <div class="cell-title" style="font-size:12.5px">{{ row.supplier.contact|default:"未填写" }}</div>
+                            <div class="cell-sub">{{ row.supplier.phone|default:"" }}</div>
+                        </td>
+                        <td>
+                            {% if row.supplier.status == '合格' %}
+                                <span class="tag tag-green"><span class="dot-indicator"></span>合格</span>
+                            {% elif row.supplier.status == '观察' %}
+                                <span class="tag tag-amber"><span class="dot-indicator"></span>观察</span>
+                            {% else %}
+                                <span class="tag tag-gray">停用</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center"><span class="tag tag-blue">{{ row.quote_count }}</span></td>
+                        <td class="text-end num">
+                            {% if row.perf %}{{ row.perf.avg_abs|money }}%{% else %}<span class="text-muted-custom">—</span>{% endif %}
+                        </td>
+                        <td class="text-center num">
+                            {% if row.perf and row.perf.high %}<span class="text-warning-custom">{{ row.perf.high }}</span>{% else %}—{% endif %}
+                        </td>
+                        <td class="actions">
+                            <a href="{% url 'pricing:quote_list' %}?supplier={{ row.supplier.pk }}" class="btn btn-ghost btn-sm">报价记录</a>
+                            {% if user.is_superuser %}
+                                <a href="{% url 'pricing:supplier_edit' row.supplier.pk %}" class="btn btn-ghost btn-sm"><i class="bi bi-pencil"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                <i class="bi bi-truck"></i>
+                                <h6>暂无供应商档案</h6>
+                                <p>录入供应商后才能登记报价并参与对比。</p>
+                                {% if user.is_superuser %}
+                                    <a href="{% url 'pricing:supplier_create' %}" class="btn btn-primary btn-sm">新增供应商</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

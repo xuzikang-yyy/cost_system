@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}新建核价 · 采购成本核价系统{% endblock %}
+{% block page_title %}新建核价{% endblock %}
+{% block breadcrumb %}业务处理 <span>/</span> <a href="{% url 'pricing:calc_list' %}" style="color:inherit">采购成本核算</a> <span>/</span> 新建核价{% endblock %}
+
+{% block header_actions %}
+    <span class="chip"><i class="bi bi-hash"></i>预分配编号 {{ next_no }}</span>
+{% endblock %}
+
+{% block content %}
+<form method="post" novalidate id="calcForm">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="card-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="section-title"><i class="bi bi-box-seam"></i>核价对象</h2>
+                        <div class="section-sub">选择零件后，系统自动带出净重、材料最新价格与该类别成本规则</div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="form-grid">
+                        {% include "partials/field.html" with field=form.part wrapper_class="span-2 mb-1" %}
+                        <div class="span-2" id="partHint" style="font-size:12px;color:var(--muted);margin-top:-6px"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="section-title"><i class="bi bi-layers"></i>材料与损耗</h2>
+                        <div class="section-sub">材料单价可手工调整，但保存后将以快照形式写入核价单</div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="form-grid">
+                        {% include "partials/field.html" with field=form.material_price %}
+                        {% include "partials/field.html" with field=form.price_date %}
+                        {% include "partials/field.html" with field=form.net_weight %}
+                        {% include "partials/field.html" with field=form.loss_rate %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="section-title"><i class="bi bi-tools"></i>加工与其他费用</h2>
+                        <div class="section-sub">没有发生的费用可保留为 0，不计入理论成本</div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="form-grid">
+                        {% include "partials/field.html" with field=form.processing_fee %}
+                        {% include "partials/field.html" with field=form.outsourcing_fee %}
+                        {% include "partials/field.html" with field=form.packaging_fee %}
+                        {% include "partials/field.html" with field=form.overhead_fee %}
+                        {% include "partials/field.html" with field=form.scrap_price %}
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="section-title"><i class="bi bi-bullseye"></i>参考报价与保存</h2>
+                        <div class="section-sub">参考报价 = 理论成本 × (1 + 合理加成率)</div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="form-grid">
+                        {% include "partials/field.html" with field=form.markup_rate %}
+                        {% include "partials/field.html" with field=form.status %}
+                        {% include "partials/field.html" with field=form.remark wrapper_class="span-2 mb-1" %}
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2-circle me-1"></i>保存核价单
+                        </button>
+                        <a href="{% url 'pricing:calc_list' %}" class="btn btn-outline-secondary">取消</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card-panel" style="position:sticky;top:86px">
+                <div class="panel-head">
+                    <div>
+                        <h2 class="section-title"><i class="bi bi-receipt"></i>实时测算</h2>
+                        <div class="section-sub">按当前输入即时计算，不写入数据库</div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="d-flex justify-content-between py-2" style="border-bottom:1px dashed var(--line)">
+                        <span class="cell-sub">材料投入量</span>
+                        <span class="num fw-600" id="pvInput">— kg</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2" style="border-bottom:1px dashed var(--line)">
+                        <span class="cell-sub">材料成本</span>
+                        <span class="num fw-600" id="pvMaterial">¥0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2" style="border-bottom:1px dashed var(--line)">
+                        <span class="cell-sub">加工 / 外协 / 包装 / 制造</span>
+                        <span class="num" id="pvOther">¥0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2" style="border-bottom:1px dashed var(--line)">
+                        <span class="cell-sub">废料回收（减项）</span>
+                        <span class="num" id="pvScrap" style="color:var(--success)">−¥0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 mt-1">
+                        <span class="fw-600" style="font-size:13px">理论单位成本</span>
+                        <span class="num fw-600" id="pvCost" style="font-size:16px">¥0.00</span>
+                    </div>
+                    <div class="summary-cell highlight mt-2" style="border-radius:8px">
+                        <div class="label">核价参考报价（不含税）</div>
+                        <div class="value" id="pvReference" style="font-size:23px">¥0.00</div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-3" style="font-size:12px">
+                        <span class="cell-sub">含税参考价（13%）</span>
+                        <span class="num" id="pvTax">¥0.00</span>
+                    </div>
+
+                    <div id="pvWarnings" class="mt-3"></div>
+
+                    <div class="formula-box mt-3" style="font-size:11.3px">
+                        投入量 = 净重 ÷ (1 − 损耗率)<br>
+                        成本 = 材料 + 加工 + 外协 + 包装 + 制造 − 废料<br>
+                        参考价 = 成本 × (1 + 加成率)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+{{ parts_config|json_script:"parts-config" }}
+<script>
+(function () {
+    const configs = JSON.parse(document.getElementById('parts-config').textContent);
+    const get = function (id) { return document.getElementById(id); };
+    const num = function (id) { const el = get(id); return el ? parseFloat(el.value || 0) : 0; };
+    const money = function (value) { return '¥' + Number(value).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+
+    function refreshPreview() {
+        const weight = num('id_net_weight');
+        const loss = num('id_loss_rate');
+        const price = num('id_material_price');
+        const rate = loss / 100;
+        const inputWeight = rate < 1 ? weight / (1 - rate) : 0;
+        const material = inputWeight * price;
+        const other = num('id_processing_fee') + num('id_outsourcing_fee') + num('id_packaging_fee') + num('id_overhead_fee');
+        const scrapWeight = Math.max(inputWeight - weight, 0);
+        const scrap = scrapWeight * num('id_scrap_price');
+        const cost = material + other - scrap;
+        const reference = cost * (1 + num('id_markup_rate') / 100);
+
+        get('pvInput').textContent = inputWeight.toFixed(4) + ' kg';
+        get('pvMaterial').textContent = money(material);
+        get('pvOther').textContent = money(other);
+        get('pvScrap').textContent = '−' + money(scrap);
+        get('pvCost').textContent = money(cost);
+        get('pvReference').textContent = money(reference);
+        get('pvTax').textContent = money(reference * 1.13);
+
+        const warnings = [];
+        if (!weight || weight <= 0) warnings.push('成品净重必须大于 0');
+        if (!price || price <= 0) warnings.push('材料单价缺失，请先维护材料价格');
+        if (loss < 0 || loss >= 100) warnings.push('损耗率应在 0% 到 100% 之间');
+        get('pvWarnings').innerHTML = warnings.length
+            ? '<div class="alert-panel"><i class="bi bi-exclamation-triangle"></i><div>' + warnings.join('<br>') + '</div></div>'
+            : '<div class="alert-panel info"><i class="bi bi-shield-check"></i><div>参数完整，可保存核价单。</div></div>';
+    }
+
+    function fillPart() {
+        const partId = get('id_part').value;
+        const part = configs[partId];
+        if (!part) {
+            get('partHint').innerHTML = '';
+            return;
+        }
+        get('id_net_weight').value = part.net_weight;
+        if (part.price) {
+            get('id_material_price').value = part.price;
+            get('id_price_date').value = part.price_date;
+        }
+        if (part.rule) {
+            get('id_loss_rate').value = part.rule.loss_rate;
+            get('id_processing_fee').value = part.rule.processing_fee;
+            get('id_outsourcing_fee').value = part.rule.outsourcing_fee;
+            get('id_packaging_fee').value = part.rule.packaging_fee;
+            get('id_overhead_fee').value = part.rule.overhead_fee;
+            get('id_scrap_price').value = part.rule.scrap_price;
+            get('id_markup_rate').value = part.rule.markup_rate;
+        }
+        const priceText = part.price ? '¥' + part.price.toFixed(2) + '/kg' : '未录入材料价格';
+        get('partHint').innerHTML = '<i class="bi bi-info-circle me-1"></i>' + part.code + ' · ' + part.category + ' · ' + part.material
+            + ' · 净重 ' + part.net_weight.toFixed(4) + ' kg · 最新材料价 ' + priceText
+            + (part.rule ? ' · 已匹配成本规则' : ' · <span style="color:#b8433c">未匹配成本规则</span>');
+        refreshPreview();
+    }
+
+    ['id_net_weight', 'id_loss_rate', 'id_material_price', 'id_processing_fee', 'id_outsourcing_fee',
+     'id_packaging_fee', 'id_overhead_fee', 'id_scrap_price', 'id_markup_rate'].forEach(function (id) {
+        const el = get(id);
+        if (el) { el.addEventListener('input', refreshPreview); }
+    });
+    const partSelect = get('id_part');
+    if (partSelect) partSelect.addEventListener('change', fillPart);
+
+    refreshPreview();
+    if (partSelect && partSelect.value && configs[partSelect.value]) {
+        const part = configs[partSelect.value];
+        get('partHint').innerHTML = '<i class="bi bi-info-circle me-1"></i>' + part.code + ' · ' + part.category + ' · ' + part.material
+            + ' · 净重 ' + part.net_weight.toFixed(4) + ' kg · 最新材料价 ' + (part.price ? '¥' + part.price.toFixed(2) + '/kg' : '未录入');
+    }
+})();
+</script>
+{% endblock %}

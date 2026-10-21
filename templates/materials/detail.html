@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}{{ material.name }} · 材料价格{% endblock %}
+{% block page_title %}材料价格档案{% endblock %}
+{% block breadcrumb %}基础数据 <span>/</span> <a href="{% url 'pricing:material_list' %}" style="color:inherit">原材料与价格</a> <span>/</span> {{ material.name }}{% endblock %}
+
+{% block header_actions %}
+    {% if user.is_superuser %}
+        <a href="{% url 'pricing:material_edit' material.pk %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil me-1"></i>编辑材料
+        </a>
+    {% endif %}
+    <a href="{% url 'pricing:material_list' %}" class="btn btn-ghost btn-sm">返回列表</a>
+{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <div class="panel-body">
+        <div class="d-flex align-items-start gap-3 flex-wrap">
+            <div class="material-thumb {% if material.material_type == '铜' %}copper{% elif material.material_type == '铝' %}aluminum{% elif material.material_type == '塑料' %}plastic{% endif %}" style="width:46px;height:46px;font-size:14px;flex-basis:46px">
+                {{ material.material_type }}
+            </div>
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h2 class="section-title" style="font-size:18px">{{ material.name }}</h2>
+                    <span class="tag tag-blue">{{ material.code }}</span>
+                    {% if material.status %}
+                        <span class="tag tag-green">启用中</span>
+                    {% else %}
+                        <span class="tag tag-gray">已停用</span>
+                    {% endif %}
+                </div>
+                <div class="cell-sub mt-1">{{ material.specification|default:"未填写常用规格" }} · 计价单位：元 / {{ material.unit }}</div>
+            </div>
+            <div class="text-end">
+                <div class="cell-sub">最新参考单价</div>
+                <div class="num" style="font-size:24px;font-weight:700">
+                    {% if latest %}¥{{ latest.price|money:4 }}{% else %}—{% endif %}
+                </div>
+                <div class="cell-sub">{% if latest %}生效于 {{ latest.effective_date|date:"Y-m-d" }} · {{ latest.source }}{% endif %}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-0">
+    <div class="col-xl-8">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-graph-up"></i>价格变动趋势</h2>
+                    <div class="section-sub">按录入的生效日期顺序展示</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                {% if price_rows %}
+                    <div id="priceChart" class="chart chart-lg"></div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-graph-up"></i>
+                        <h6>暂无价格记录</h6>
+                        <p>录入第一条价格后即可查看趋势。</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-plus-circle"></i>录入新价格</h2>
+                    <div class="section-sub">同一材料同一天不允许重复</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                {% if user.is_superuser %}
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {{ form.material.as_hidden }}
+                        {% include "partials/field.html" with field=form.price %}
+                        {% include "partials/field.html" with field=form.effective_date %}
+                        {% include "partials/field.html" with field=form.source %}
+                        {% if form.errors %}
+                            <div class="alert alert-danger" style="font-size:12px">{{ form.errors }}</div>
+                        {% endif %}
+                        <button class="btn btn-primary w-100" type="submit">
+                            <i class="bi bi-check2 me-1"></i>保存价格记录
+                        </button>
+                    </form>
+                    <div class="alert-panel info mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        <div>历史核价单保存的是当时的材料价格快照，这里新增价格不会改写历史结果。</div>
+                    </div>
+                {% else %}
+                    <div class="alert-panel">
+                        <i class="bi bi-lock"></i>
+                        <div>材料价格由管理员维护。如需新增价格记录，请联系系统管理员。</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-0">
+    <div class="col-xl-8">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-table"></i>价格记录</h2>
+                    <div class="section-sub">共 {{ price_rows|length }} 条价格快照</div>
+                </div>
+            </div>
+            <div class="panel-body tight">
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>生效日期</th>
+                                <th class="text-end">参考单价</th>
+                                <th class="text-end">较上次变动</th>
+                                <th>价格来源</th>
+                                <th>录入时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in price_rows %}
+                                <tr>
+                                    <td class="num">{{ row.price.effective_date|date:"Y-m-d" }}</td>
+                                    <td class="text-end num strong">¥{{ row.price.price|money:4 }}</td>
+                                    <td class="text-end num">
+                                        {% if row.change is not None %}
+                                            <span class="{% if row.change > 0 %}text-danger-custom{% elif row.change < 0 %}text-success-custom{% else %}text-muted-custom{% endif %}">
+                                                {{ row.change|signed }}%
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted-custom">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="tag tag-gray">{{ row.price.source }}</span></td>
+                                    <td class="cell-sub">{{ row.price.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="5"><div class="empty-state" style="padding:30px"><i class="bi bi-inbox"></i><h6>暂无价格记录</h6></div></td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-box-seam"></i>关联零件</h2>
+                    <div class="section-sub">使用该材料进行核价的零件</div>
+                </div>
+            </div>
+            <div class="panel-body tight">
+                {% for part in parts %}
+                    <a href="{% url 'pricing:part_detail' part.pk %}" class="d-flex align-items-center gap-2 px-3 py-3 text-reset" style="border-bottom:1px solid #eef2f5">
+                        <div class="flex-grow-1">
+                            <div class="cell-title">{{ part.name }}</div>
+                            <div class="cell-sub">{{ part.code }} · 净重 {{ part.net_weight|money:4 }} kg</div>
+                        </div>
+                        <i class="bi bi-chevron-right text-muted-custom" style="font-size:11px"></i>
+                    </a>
+                {% empty %}
+                    <div class="empty-state" style="padding:26px">
+                        <i class="bi bi-box"></i>
+                        <h6>暂无关联零件</h6>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ chart|json_script:"price-chart" }}
+<script>
+(function () {
+    const data = JSON.parse(document.getElementById('price-chart').textContent);
+    if (!data.labels.length) return;
+    CostUI.makeChart('priceChart', CostUI.lineOption({
+        labels: data.labels,
+        series: [{ name: '{{ material.name }}', data: data.values }],
+        legend: false,
+        area: true
+    }));
+})();
+</script>
+{% endblock %}

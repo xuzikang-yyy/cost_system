@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load pricing_extras %}
+
+{% block title %}{{ title }} · 采购成本核价系统{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block breadcrumb %}业务处理 <span>/</span> <a href="{% url 'pricing:quote_list' %}" style="color:inherit">供应商报价</a> <span>/</span> {{ title }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card-panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-file-earmark-text"></i>{{ title }}</h2>
+                    <div class="section-sub">请按供应商实际报价口径填写，系统保存原始值并自动换算统一口径</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" novalidate id="quoteForm">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="form-grid">
+                        <div class="form-section-label">报价对象</div>
+                        {% include "partials/field.html" with field=form.supplier %}
+                        {% include "partials/field.html" with field=form.part %}
+                        {% include "partials/field.html" with field=form.quote_date %}
+                        {% include "partials/field.html" with field=form.lead_time_days %}
+
+                        <div class="form-section-label">报价与计价口径</div>
+                        {% include "partials/field.html" with field=form.unit_price %}
+                        {% include "partials/field.html" with field=form.price_unit %}
+                        {% include "partials/field.html" with field=form.currency %}
+                        {% include "partials/field.html" with field=form.exchange_rate %}
+                        {% include "partials/field.html" with field=form.tax_rate %}
+                        <div class="span-2">
+                            <div class="form-check">
+                                {{ form.tax_included }}
+                                <label class="form-check-label" for="{{ form.tax_included.id_for_label }}">该报价为含税价（系统将按税率换算为不含税口径）</label>
+                            </div>
+                        </div>
+                        <div class="span-2">
+                            {% include "partials/field.html" with field=form.remark %}
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">保存报价</button>
+                        {% if quote %}
+                            <a href="{% url 'pricing:part_detail' quote.part.pk %}" class="btn btn-outline-secondary">返回零件</a>
+                        {% else %}
+                            <a href="{% url 'pricing:quote_list' %}" class="btn btn-outline-secondary">返回报价台账</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card-panel" style="position:sticky;top:86px">
+            <div class="panel-head">
+                <div>
+                    <h2 class="section-title"><i class="bi bi-arrow-repeat"></i>口径换算预览</h2>
+                    <div class="section-sub">实时计算，保存前即可核对</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--line)">
+                    <span class="cell-sub">零件净重</span>
+                    <span class="num fw-600" id="previewWeight">—</span>
+                </div>
+                <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--line)">
+                    <span class="cell-sub">统一口径报价</span>
+                    <span class="num fw-600" id="previewNormalized" style="font-size:18px">¥0.00</span>
+                </div>
+                <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--line)">
+                    <span class="cell-sub">核价参考报价</span>
+                    <span class="num" id="previewReference">—</span>
+                </div>
+                <div class="d-flex justify-content-between py-2">
+                    <span class="cell-sub">报价偏差率</span>
+                    <span class="num fw-600" id="previewRate">—</span>
+                </div>
+                <div id="previewLevel" class="mt-2"></div>
+
+                <div class="alert-panel info mt-3">
+                    <i class="bi bi-info-circle"></i>
+                    <div>统一口径 = 原始报价 → 按净重折算为元/件 → 含税价除以 (1 + 税率) → 美元乘以汇率。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ parts_info|json_script:"parts-info" }}
+<script>
+(function () {
+    const info = JSON.parse(document.getElementById('parts-info').textContent);
+    const get = function (id) { return document.getElementById(id); };
+    const fields = ['id_part', 'id_unit_price', 'id_price_unit', 'id_currency', 'id_exchange_rate', 'id_tax_rate', 'id_tax_included', 'id_currency'];
+    const money = function (value) { return '¥' + value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+
+    function refresh() {
+        const part = info[get('id_part') ? get('id_part').value : ''];
+        if (!part) {
+            get('previewWeight').textContent = '—';
+            get('previewReference').textContent = '—';
+            get('previewRate').textContent = '—';
+            get('previewNormalized').textContent = '¥0.00';
+            get('previewLevel').innerHTML = '';
+            return;
+        }
+        let price = parseFloat(get('id_unit_price').value || 0);
+        if (get('id_price_unit').value === '千克') price *= part.net_weight;
+        if (get('id_tax_included').checked) {
+            const tax = parseFloat(get('id_tax_rate').value || 0) / 100;
+            price = price / (1 + tax);
+        }
+        if (get('id_currency').value === 'USD') {
+            price *= parseFloat(get('id_exchange_rate').value || 1);
+        }
+
+        get('previewWeight').textContent = part.net_weight.toFixed(4) + ' kg';
+        get('previewNormalized').textContent = money(price);
+
+        if (!part.reference) {
+            get('previewReference').textContent = '尚无核价基准';
+            get('previewRate').textContent = '—';
+            get('previewLevel').innerHTML = '<span class="tag tag-gray">缺参考价</span>';
+            return;
+        }
+
+        get('previewReference').textContent = money(part.reference);
+        const rate = (price - part.reference) / part.reference * 100;
+        const el = get('previewRate');
+        el.textContent = (rate >= 0 ? '+' : '') + rate.toFixed(2) + '%';
+        el.style.color = rate > part.high ? '#b8433c' : (rate < part.low ? '#a8741c' : '#1f7a5c');
+
+        let cls = 'tag-gray', text = '待判定';
+        if (rate > part.high) { cls = 'tag-red'; text = '偏高 · 超出合理区间'; }
+        else if (rate < part.low) { cls = 'tag-amber'; text = '偏低 · 超出合理区间'; }
+        else { cls = 'tag-green'; text = '正常 · 在合理区间内'; }
+        get('previewLevel').innerHTML = '<span class="tag ' + cls + '">' + text + '</span>';
+    }
+
+    fields.forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', refresh);
+        el.addEventListener('change', refresh);
+    });
+    refresh();
+})();
+</script>
+{% endblock %}
