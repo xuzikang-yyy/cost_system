@@ -1,8 +1,11 @@
 .vendor/
+.venv/
+venv/
 staticfiles/
 logs/
 deploy/bin/
 deploy/env.production
+.env
 __pycache__/
 *.pyc
 db.sqlite3

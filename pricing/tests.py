@@ -8,7 +8,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import CostRule, Material, Part, Supplier, SupplierQuote
-from .services import compute_cost, create_calculation, quote_metrics
+from .services import (
+    compute_cost,
+    create_calculation,
+    latest_calculation,
+    quote_metrics,
+)
 
 
 class CostEngineTests(TestCase):
@@ -67,6 +72,74 @@ class CostEngineTests(TestCase):
                 processing_fee=0, outsourcing_fee=0, packaging_fee=0, overhead_fee=0,
                 scrap_price=0, markup_rate=0,
             )
+
+    def test_invalid_net_weight(self):
+        with self.assertRaises(ValueError):
+            compute_cost(
+                net_weight=Decimal("0"), material_price=Decimal("10"), loss_rate=Decimal("3"),
+                processing_fee=0, outsourcing_fee=0, packaging_fee=0, overhead_fee=0,
+                scrap_price=0, markup_rate=0,
+            )
+
+    def test_negative_material_price(self):
+        with self.assertRaises(ValueError):
+            compute_cost(
+                net_weight=Decimal("1"), material_price=Decimal("-1"), loss_rate=Decimal("3"),
+                processing_fee=0, outsourcing_fee=0, packaging_fee=0, overhead_fee=0,
+                scrap_price=0, markup_rate=0,
+            )
+
+    def test_quote_normalized_per_kg_cny(self):
+        quote = SupplierQuote.objects.create(
+            supplier=self.supplier, part=self.part, unit_price=Decimal("30.00"),
+            price_unit="千克", tax_included=True, tax_rate=Decimal("13.00"),
+        )
+        self.assertEqual(quote.normalized_price, Decimal("8.4956"))
+
+    def test_latest_calculation_ignores_draft(self):
+        confirmed = create_calculation(
+            part=self.part, rule=self.rule, user=self.user,
+            data={
+                "net_weight": Decimal("0.3200"), "material_price": Decimal("62.50"),
+                "loss_rate": Decimal("2.50"), "processing_fee": Decimal("1.80"),
+                "outsourcing_fee": Decimal("0.60"), "packaging_fee": Decimal("0.15"),
+                "overhead_fee": Decimal("0.45"), "scrap_price": Decimal("48.00"),
+                "markup_rate": Decimal("8.00"), "price_date": timezone.localdate(),
+            },
+            status="confirmed",
+        )
+        draft = create_calculation(
+            part=self.part, rule=self.rule, user=self.user,
+            data={
+                "net_weight": Decimal("0.3200"), "material_price": Decimal("70.00"),
+                "loss_rate": Decimal("2.50"), "processing_fee": Decimal("1.80"),
+                "outsourcing_fee": Decimal("0.60"), "packaging_fee": Decimal("0.15"),
+                "overhead_fee": Decimal("0.45"), "scrap_price": Decimal("48.00"),
+                "markup_rate": Decimal("8.00"), "price_date": timezone.localdate(),
+            },
+            status="draft",
+        )
+        self.assertEqual(latest_calculation(self.part).pk, confirmed.pk)
+        self.assertEqual(latest_calculation(self.part, confirmed_only=False).pk, draft.pk)
+
+    def test_snapshot_isolated_from_rule_updates(self):
+        calc = create_calculation(
+            part=self.part, rule=self.rule, user=self.user,
+            data={
+                "net_weight": Decimal("0.3200"), "material_price": Decimal("62.50"),
+                "loss_rate": Decimal("2.50"), "processing_fee": Decimal("1.80"),
+                "outsourcing_fee": Decimal("0.60"), "packaging_fee": Decimal("0.15"),
+                "overhead_fee": Decimal("0.45"), "scrap_price": Decimal("48.00"),
+                "markup_rate": Decimal("8.00"), "price_date": timezone.localdate(),
+            },
+        )
+        self.rule.loss_rate = Decimal("10.00")
+        self.rule.markup_rate = Decimal("20.00")
+        self.rule.save()
+        calc.refresh_from_db()
+        self.assertEqual(calc.loss_rate, Decimal("2.50"))
+        self.assertEqual(calc.markup_rate, Decimal("8.00"))
+        self.assertEqual(calc.reference_price, Decimal("24.97"))
 
     def test_quote_normalized_from_tax_included(self):
         quote = SupplierQuote.objects.create(
@@ -153,6 +226,11 @@ class ViewAccessTests(TestCase):
         response = self.client.get(reverse("pricing:system"))
         self.assertEqual(response.status_code, 302)
 
+    def test_buyer_cannot_view_audit_log(self):
+        self.client.force_login(self.buyer)
+        response = self.client.get(reverse("pricing:audit_log"))
+        self.assertEqual(response.status_code, 302)
+
     def test_buyer_can_create_calculation_page(self):
         self.client.force_login(self.buyer)
         response = self.client.get(reverse("pricing:calc_create"))
@@ -161,6 +239,6 @@ class ViewAccessTests(TestCase):
     def test_admin_can_open_dashboard(self):
         self.client.force_login(self.admin)
         for name in ["dashboard", "material_list", "part_list", "rule_list", "supplier_list",
-                     "quote_list", "calc_list", "analysis", "system"]:
+                     "quote_list", "calc_list", "analysis", "system", "audit_log"]:
             response = self.client.get(reverse(f"pricing:{name}"))
             self.assertEqual(response.status_code, 200, name)
